@@ -2,7 +2,7 @@
 
 A C simulation of Phase 1 of a teaching operating system (MOS). The program models a small computer (a 100-word memory, a few registers and a seven-instruction CPU) together with a minimal operating system layer. The OS reads jobs from a card-image input file, runs them one at a time, and writes the results to an output file.
 
-This repository covers Phase 1 only. Jobs run one after another, so features such as paging, scheduling and time or line limits are not part of it.
+This folder covers Stage I only. Jobs run one after another, so paging and scheduling are not part of it; those are in Stage II (see [`../phase2`](../phase2)). The time limit on the job card is enforced; the line limit is read but not enforced.
 
 ## How it works
 
@@ -29,6 +29,7 @@ input file -> loader -> memory -> CPU (fetch, decode, execute)
 | `R` | General purpose register (4 characters). |
 | `C` | Toggle (0 or 1). Set by `CR`, tested by `BT`. |
 | `SI` | Service interrupt code. Set by `GD`, `PD` and `H` before `MOS()` is called. |
+| `TTL` / `TTC` | Time limit read from the `$AMJ` card, and a counter that goes up by one for every instruction executed. |
 
 ## Instruction set
 
@@ -72,7 +73,7 @@ $DTA
 $END<job id>
 ```
 
-- **`$AMJ` card.** Starts a job and resets memory. The three 4-digit fields (job id, time limit, line limit) are read as part of the card but are not used in Phase 1.
+- **`$AMJ` card.** Starts a job and resets memory. The three 4-digit fields are the job id, the time limit and the line limit. The time limit is enforced (see below). The job id and line limit are not used. If the time limit field is missing or not numeric, the job runs with no limit.
 - **Program cards.** Up to 40 characters each, so 10 instructions per card. Card 1 goes into words 00 to 09, card 2 into words 10 to 19, and so on. A job can have at most 10 program cards.
 - **`$DTA` card.** Marks the end of the program and starts execution.
 - **Data cards.** One card is consumed by each `GD`. Cards longer than 40 characters are cut to 40, and shorter ones are padded with spaces.
@@ -97,7 +98,14 @@ Choose data addresses that do not overlap the program. A one-card program uses w
 | `INVALID OPERATION: xx` | The opcode is not one of the seven instructions. |
 | `INVALID INSTRUCTION ADDRESS` | `IC` moved outside memory. |
 | `INVALID SUPERVISOR CALL` | `SI` had a value other than 1, 2 or 3. |
+| `TIME LIMIT EXCEEDED` | The job executed more instructions than the time limit on its `$AMJ` card. |
 | `MEMORY EXCEEDED` | The program has more than 10 cards. |
+
+## Time limit
+
+Every instruction that is fetched adds 1 to the time counter `TTC`. If `TTC` becomes greater than the time limit (`TTL`) from the `$AMJ` card, the job is stopped, `TIME LIMIT EXCEEDED` is written, and the loader moves on to the next job. This prevents a looping program from hanging the simulator.
+
+For the sample job (`GD20`, `PD20`, `H`) the counter reaches 3, so a limit of `0003` is enough and a limit of `0002` stops the job after the `PD` has already written its line.
 
 ## Example
 
@@ -168,7 +176,8 @@ If the arguments are left out, the program uses `input.txt` and `output.txt`. Wh
 
 ## Limitations
 
-- The time limit and line limit on the `$AMJ` card are not enforced. A program that loops forever, such as `GD20LR20CR20BT01H`, will never stop.
+- The line limit on the `$AMJ` card is read but not enforced.
+- Every instruction costs one time unit. There is no separate cost for `GD` or `PD`.
 - Only one job runs at a time. There is no multiprogramming, paging or process scheduling.
 - Only the first 40 characters of any card are used.
 - Data cards that a job does not read are skipped when the loader searches for the next `$AMJ`.
@@ -176,10 +185,9 @@ If the arguments are left out, the program uses `input.txt` and `output.txt`. Wh
 ## Project structure
 
 ```
-MOS-Phase1-Simulation/
+phase1/
 |-- main.c              Simulator source code
 |-- input_Phase1.txt    Sample job
 |-- output.txt          Output produced by the sample job
-|-- mos.exe             Prebuilt Windows executable
 `-- README.md
 ```
