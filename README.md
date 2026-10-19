@@ -22,7 +22,6 @@ The project is built in two stages. Stage I is the basic machine and supervisor 
 - [Limitations](#limitations)
 - [Project structure](#project-structure)
 - [OS concepts covered](#os-concepts-covered)
-- [Author](#author)
 
 ## What each stage covers
 
